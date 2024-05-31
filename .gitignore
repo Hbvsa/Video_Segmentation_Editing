@@ -1,6 +1,6 @@
 venv/
-src/models/*
 jason.mp4
+src/models/*
 .idea
 __pycache__
-!src/models/
+!src/models/.gitkeep
