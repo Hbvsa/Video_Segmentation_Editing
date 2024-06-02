@@ -35,8 +35,16 @@ def show_points(coords, labels, ax, marker_size=375):
                linewidth=1.25)
     ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white',
                linewidth=1.25)
+def record_clicks(event, x, y, flags, param):
+    global input_points
+    if event == cv2.EVENT_LBUTTONDOWN:
+        input_points.append((x, y))
 
-def video_pipeline(video_path, ad_image_path):
+def video_pipeline(video_path, ad_image_path, max_frames, seg_per_sec, show):
+
+    global input_points
+    input_points = []
+    input_labels = []
 
     # Model load
     predictor, ort_session = model_setup()
@@ -52,36 +60,42 @@ def video_pipeline(video_path, ad_image_path):
 
     #Visualize before executing
     fig, ax = plt.subplots()
-    ret, frame = cap.read() #read one frame
+    ret, frame = cap.read()
 
-    # Input prompt to choose segmentation location
-    input_point = np.array([[frame.shape[1] // 3, frame.shape[0] // 10]]) # Example input point
-    input_label = np.array([1]) #Positive label
-
+    # Display the frame for user input
+    cv2.imshow('Select Points', frame)
+    cv2.setMouseCallback('Select Points', record_clicks)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    input_points_array = np.array(input_points)
+    input_labels = np.ones(len(input_points_array))
     #Show points and mask
-    show_points(input_point, input_label, plt.gca())
-    mask_image, alpha_mask = return_mask(frame, predictor, ort_session, ad_image, input_point, input_label)
+    show_points(input_points_array, input_labels, plt.gca())
+    mask_image, alpha_mask = return_mask(frame, predictor, ort_session, ad_image, input_points_array, input_labels)
     frame = apply_mask_to_frame_v2(frame, alpha_mask, mask_image)
     ax.imshow(frame)
 
     #Limit for testing
     frame_count = 0
-    max_frames = 60*10
-
     # Process each frame
     while cap.isOpened() and frame_count < max_frames:
 
         ret, frame = cap.read()
-        mask_image, alpha_mask = return_mask(frame, predictor, ort_session, ad_image, input_point, input_label )
+
+        if frame_count % 60 / int(seg_per_sec) == 0:
+            mask_image, alpha_mask = return_mask(frame, predictor, ort_session, ad_image, input_points, input_labels)
+
         frame = apply_mask_to_frame_v2(frame, alpha_mask, mask_image)
 
-        cv2.imshow('Processed Frame', frame)
+        if show:
+            cv2.imshow('Processed Frame', frame)
 
         # Break the loop if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
         frame_count += 1
+        out.write(frame)
 
     # Release resources
     cap.release()

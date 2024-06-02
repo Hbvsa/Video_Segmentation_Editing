@@ -7,6 +7,7 @@ import torch
 from onnxruntime.quantization import QuantType
 import onnxruntime
 from pathlib import Path
+import os
 
 def load_sam():
     with open('./src/components/config_model.yaml', 'r') as config_file:
@@ -14,9 +15,14 @@ def load_sam():
 
     checkpoint = config["checkpoint"]
     model_type = config["model_type"]
+
+    # Check if the checkpoint file exists
+    if not os.path.exists(checkpoint):
+        # Download the checkpoint file using wget
+        os.system(f'wget -O {checkpoint} https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth')
+
     sam = sam_model_registry[model_type](checkpoint=checkpoint)
     return sam
-
 def initialize_predictor(sam):
     sam.to(device='cuda')
     predictor = SamPredictor(sam)
